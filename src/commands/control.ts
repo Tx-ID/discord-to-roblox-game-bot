@@ -342,6 +342,12 @@ export const controlCommand: Command = {
                             });
 
                         } catch (err) {
+                            console.error("Failed to publish message:", err);
+                            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred.';
+                            await i.followUp({
+                                content: `❌ **Failed to send message:** ${errorMessage}`,
+                                ephemeral: true
+                            }).catch(() => {});
                         }
                     }
                 } else if (i.isStringSelectMenu() && i.customId === 'server-select') {
@@ -350,7 +356,12 @@ export const controlCommand: Command = {
                 }
             } catch (err) {
                 console.error("Control interaction error:", err);
-                if (!i.replied && !i.deferred) await i.reply({ content: 'Interaction failed.', ephemeral: true }).catch(() => {});
+                const errorMessage = err instanceof Error ? err.message : 'Interaction failed.';
+                if (!i.replied && !i.deferred) {
+                    await i.reply({ content: `❌ ${errorMessage}`, ephemeral: true }).catch(() => {});
+                } else {
+                    await i.followUp({ content: `❌ ${errorMessage}`, ephemeral: true }).catch(() => {});
+                }
             }
         });
 

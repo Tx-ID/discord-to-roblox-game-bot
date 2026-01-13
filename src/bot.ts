@@ -39,12 +39,16 @@ export class Bot {
             try {
                 await command.execute(interaction);
             } catch (error) {
-                console.error(error);
-                const errorMessage = 'There was an error while executing this command!';
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp({ content: errorMessage, ephemeral: true });
-                } else {
-                    await interaction.reply({ content: errorMessage, ephemeral: true });
+                console.error(`Error executing command ${interaction.commandName}:`, error);
+                try {
+                    const errorMessage = 'There was an error while executing this command!';
+                    if (interaction.replied || interaction.deferred) {
+                        await interaction.followUp({ content: errorMessage, ephemeral: true });
+                    } else {
+                        await interaction.reply({ content: errorMessage, ephemeral: true });
+                    }
+                } catch (sendError) {
+                    console.error('Failed to send error message to user:', sendError);
                 }
             }
         });
@@ -114,8 +118,12 @@ export class Bot {
                 try {
                     await command.executePrefix(message, args);
                 } catch (error) {
-                    console.error(error);
-                    message.reply('There was an error while executing this command!');
+                    console.error(`Error executing prefix command ${commandName}:`, error);
+                    try {
+                        await message.reply('There was an error while executing this command!');
+                    } catch (sendError) {
+                        console.error('Failed to send prefix command error message:', sendError);
+                    }
                 }
             }
         });

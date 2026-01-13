@@ -1,12 +1,19 @@
 import mongoose from 'mongoose';
 import { config } from '../config';
 import { BlacklistModel } from './models/Blacklist';
+import { PlaceCacheModel } from './models/PlaceCache';
+
+interface InMemoryPlaceCache {
+    universeId: number;
+    expiresAt: number;
+}
 
 class DatabaseManager {
     private static instance: DatabaseManager;
     private isInMemory: boolean = false;
     private inMemoryStore: Map<string, any> = new Map();
     private inMemoryBlacklist: Set<string> = new Set();
+    private inMemoryPlaceCache: Map<string, InMemoryPlaceCache> = new Map();
 
     private constructor() {}
 
@@ -78,6 +85,39 @@ class DatabaseManager {
         } else {
             const entry = await BlacklistModel.findOne({ userId });
             return !!entry;
+        }
+    }
+
+    // PlaceCache Methods
+    public async getPlaceCache(placeId: string): Promise<number | null> {
+        if (this.isInMemory) {
+            const cached = this.inMemoryPlaceCache.get(placeId);
+            if (cached && cached.expiresAt > Date.now()) {
+                return cached.universeId;
+            }
+            if (cached) {
+                this.inMemoryPlaceCache.delete(placeId);
+            }
+            return null;
+        } else {
+            const entry = await PlaceCacheModel.findOne({ placeId });
+            return entry ? entry.universeId : null;
+        }
+    }
+
+    public async setPlaceCache(placeId: string, universeId: number): Promise<void> {
+        if (this.isInMemory) {
+            this.inMemoryPlaceCache.set(placeId, {
+                universeId,
+                expiresAt: Date.now() + 3600 * 1000 // 1 hour
+            });
+        } else {
+            try {
+                await PlaceCacheModel.create({ placeId, universeId });
+            } catch (error: any) {
+                if (error.code === 11000) return; // Duplicate key, ignore
+                throw error;
+            }
         }
     }
 }

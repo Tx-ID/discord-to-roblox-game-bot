@@ -11,6 +11,17 @@ const bot = new Bot();
     });
 })();
 
+// Global Error Handlers to prevent crash
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Keep process alive if possible, or restart via PM2
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Keep process alive
+});
+
 const shutdown = async () => {
     console.log('\nGracefully shutting down...');
     await disconnectDatabase();

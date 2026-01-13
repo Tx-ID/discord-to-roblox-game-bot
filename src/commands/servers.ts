@@ -23,7 +23,8 @@ export const serversCommand: Command = {
 
             await interaction.editReply(`Found ${serverCount} active servers with a total of ${totalPlayers} players for Place ID ${placeId}.`);
         } catch (error) {
-            await interaction.editReply('Failed to fetch server information. Please check the Place ID and try again.');
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            await interaction.editReply(`❌ Failed to fetch server information: ${message}`);
         }
     },
 
@@ -41,7 +42,8 @@ export const serversCommand: Command = {
 
             message.reply(`Found ${serverCount} active servers with a total of ${totalPlayers} players.`);
         } catch (error) {
-            message.reply('Failed to fetch server information. Please check the Place ID and try again.');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            message.reply(`❌ Failed to fetch server information: ${errorMessage}`);
         }
     }
 };

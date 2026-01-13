@@ -5,6 +5,7 @@ import { serversCommand } from './servers';
 import { blacklistCommand } from './blacklist';
 import { controlCommand } from './control';
 import { howtoCommand } from './howto';
+import { executeCommand } from './execute';
 
 export const commands = new Collection<string, Command>();
 
@@ -13,5 +14,6 @@ commands.set(serversCommand.data.name, serversCommand);
 commands.set(blacklistCommand.data.name, blacklistCommand);
 commands.set(controlCommand.data.name, controlCommand);
 commands.set(howtoCommand.data.name, howtoCommand);
+commands.set(executeCommand.data.name, executeCommand);
 
-export { pingCommand, serversCommand, blacklistCommand, controlCommand, howtoCommand };
+export { pingCommand, serversCommand, blacklistCommand, controlCommand, howtoCommand, executeCommand };

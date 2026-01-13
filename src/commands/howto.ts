@@ -47,8 +47,22 @@ MS:SubscribeAsync("perseus-all-admin", onMsg)`;
                            '• **perseus-all-admin**: `{"Payload": "string"}`'
                 },
                 {
+                    name: '⏳ Rate Limits (Roblox Cloud API)',
+                    value: 'Roblox may return these headers when limits are reached:\n' +
+                           '• `x-ratelimit-limit`: Your total quota.\n' +
+                           '• `x-ratelimit-remaining`: Remaining requests in current window.\n' +
+                           '• `x-ratelimit-reset`: Seconds until the quota resets.'
+                },
+                {
                     name: '⚠️ Note',
                     value: 'Use `HttpService:JSONDecode` to parse Objects sent from the Control Panel.'
+                },
+                {
+                    name: '🚀 Luau Execution (/execute)',
+                    value: 'The `/execute` command uses Roblox **Open Cloud Luau Execution**.\n' +
+                           '• It **DOES NOT** run in your existing public servers.\n' +
+                           '• It creates a **new, empty server** specifically to run your script.\n' +
+                           '• Best used for **maintenance tasks, data migrations, or debugging** in a clean environment.'
                 },
                 {
                     name: '📜 Example',
