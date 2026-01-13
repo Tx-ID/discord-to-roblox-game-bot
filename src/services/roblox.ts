@@ -263,6 +263,76 @@ export class RobloxService {
              return '';
         }
     }
+
+    public async getUsers(userIds: number[]): Promise<{ id: number; name: string; displayName: string }[]> {
+        if (userIds.length === 0) return [];
+        
+        let allUsers: { id: number; name: string; displayName: string }[] = [];
+        const missingUserIds: number[] = [];
+
+        // 1. Check Cache
+        try {
+            const cachedUsers = await dbManager.getUserCache(userIds);
+            allUsers = allUsers.concat(cachedUsers);
+            
+            const cachedIds = new Set(cachedUsers.map(u => u.id));
+            for (const id of userIds) {
+                if (!cachedIds.has(id)) {
+                    missingUserIds.push(id);
+                }
+            }
+        } catch (error) {
+            console.error('Error reading from UserCache:', error);
+            missingUserIds.push(...userIds);
+        }
+
+        if (missingUserIds.length === 0) {
+            return allUsers;
+        }
+
+        // 2. Fetch Missing from API
+        const chunks = [];
+        const chunkSize = 100;
+        for (let i = 0; i < missingUserIds.length; i += chunkSize) {
+            chunks.push(missingUserIds.slice(i, i + chunkSize));
+        }
+
+        const newUsers: { id: number; name: string; displayName: string }[] = [];
+
+        for (const chunk of chunks) {
+            try {
+                const response = await this.request<{ data: { id: number; name: string; displayName: string }[] }>(
+                    'users',
+                    '/v1/users',
+                    {
+                        method: 'POST',
+                        data: {
+                            userIds: chunk,
+                            excludeBannedUsers: false
+                        }
+                    }
+                );
+                if (response.data) {
+                    newUsers.push(...response.data);
+                }
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                // Continue to next chunk if one fails
+            }
+        }
+
+        // 3. Update Cache with New Users
+        if (newUsers.length > 0) {
+            try {
+                await dbManager.setUserCache(newUsers);
+            } catch (error) {
+                console.error('Error saving to UserCache:', error);
+            }
+            allUsers = allUsers.concat(newUsers);
+        }
+
+        return allUsers;
+    }
 }
 
 export const robloxService = RobloxService.getInstance();
