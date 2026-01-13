@@ -13,17 +13,22 @@ local HS = game:GetService("HttpService")
 local function onMsg(msg)
     local data = msg.Data
     -- If data is a JSON string (Object from Bot):
-    local success, payload = pcall(function() return HS:JSONDecode(data) end)
+    local success, decoded = pcall(function() return HS:JSONDecode(data) end)
     
     if success then
-        print("Object received:", payload)
+        -- Check if it's meant for this server or all
+        if not decoded.JobId or decoded.JobId == game.JobId then
+            print("Received Payload:", decoded.Payload)
+        end
     else
-        print("String received:", data)
+        print("Raw string received:", data)
     end
 end
 
 MS:SubscribeAsync("perseus", onMsg)
-MS:SubscribeAsync("perseus-admin", onMsg)`;
+MS:SubscribeAsync("perseus-all", onMsg)
+MS:SubscribeAsync("perseus-admin", onMsg)
+MS:SubscribeAsync("perseus-all-admin", onMsg)`;
 
         const embed = new EmbedBuilder()
             .setTitle('📘 Roblox Setup')
@@ -33,6 +38,13 @@ MS:SubscribeAsync("perseus-admin", onMsg)`;
                 {
                     name: '📡 Topics & Data Types',
                     value: '• `perseus` / `all`: Supports **Objects** (JSON) or **Strings**.\n• `perseus-admin` / `all`: Supports **Strings Only** (Chat Commands).'
+                },
+                {
+                    name: '📦 Message Structure (msg.Data)',
+                    value: '• **perseus**: `{"JobId": "...", "Payload": {}}` or `string`\n' +
+                           '• **perseus-all**: `{"Payload": {}}` or `string`\n' +
+                           '• **perseus-admin**: `{"JobId": "...", "Payload": "string"}`\n' +
+                           '• **perseus-all-admin**: `{"Payload": "string"}`'
                 },
                 {
                     name: '⚠️ Note',
