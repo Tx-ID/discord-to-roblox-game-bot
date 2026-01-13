@@ -12,7 +12,8 @@ import {
     TextInputBuilder,
     TextInputStyle,
     PermissionFlagsBits,
-    ButtonInteraction
+    ButtonInteraction,
+    EmbedBuilder
 } from 'discord.js';
 import { Command } from './command.interface';
 import { robloxService } from '../services/roblox';
@@ -71,7 +72,7 @@ export const controlCommand: Command = {
 
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('server-select')
-                .setPlaceholder(`Select a server (Page ${page + 1}/${totalPages}`)
+                .setPlaceholder(`Select a server (Page ${page + 1}/${totalPages})`)
                 .addOptions(options);
 
             const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
@@ -90,8 +91,8 @@ export const controlCommand: Command = {
                 new ButtonBuilder().setCustomId('refresh-list').setLabel('Refresh List').setStyle(ButtonStyle.Secondary)
             );
             if (buttonsRow.components.length > 0) {
-                navRow.addComponents(buttonsRow.components); // Merge pagination into nav row if needed, but separate is cleaner usually
-                return [selectRow, buttonsRow, navRow];
+                navRow.addComponents(buttonsRow.components);
+                return [selectRow, navRow];
             }
 
             return [selectRow, navRow];
@@ -116,18 +117,24 @@ export const controlCommand: Command = {
         };
 
         const renderModeSelect = async (i?: any) => {
+            const embed = new EmbedBuilder()
+                .setTitle('🎮 Control Panel')
+                .setDescription('Select an operation mode to interact with your Roblox game.')
+                .addFields(
+                    { name: 'Place ID', value: `\`${placeId}\``, inline: true },
+                    { name: 'Universe ID', value: `\`${universeId}\``, inline: true }
+                )
+                .setColor(0x5865F2)
+                .setTimestamp();
+
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder().setCustomId('mode-specific').setLabel('Target Specific Server').setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId('mode-broadcast').setLabel('Broadcast to All Servers').setStyle(ButtonStyle.Danger)
             );
             
             const payload = {
-                content: `**Control Panel**
-Place ID: 
-${placeId}
-Universe ID: 
-${universeId}
-Select an operation mode:`,
+                content: '',
+                embeds: [embed],
                 components: [row]
             };
 
@@ -138,8 +145,14 @@ Select an operation mode:`,
         const renderServerSelect = async (i: any) => {
             await fetchServers();
             if (servers.length === 0) {
+                const embed = new EmbedBuilder()
+                    .setTitle('❌ No Active Servers')
+                    .setDescription('Could not find any active servers for this place.')
+                    .setColor(0xED4245);
+
                 await i.update({ 
-                    content: 'No active servers found.', 
+                    content: '',
+                    embeds: [embed],
                     components: [
                         new ActionRowBuilder<ButtonBuilder>().addComponents(
                             new ButtonBuilder().setCustomId('mode-back').setLabel('Back').setStyle(ButtonStyle.Danger),
@@ -149,37 +162,51 @@ Select an operation mode:`,
                 });
                 return;
             }
+
+            const totalPages = Math.ceil(servers.length / ITEMS_PER_PAGE);
             const components = generateServerListComponents(currentPage);
             
-            let content = `**Select Server**
-Found ${servers.length} servers. Page ${currentPage + 1}/${Math.ceil(servers.length / ITEMS_PER_PAGE)}.`;
+            const embed = new EmbedBuilder()
+                .setTitle('🖥️ Select Server')
+                .setDescription(`Found **${servers.length}** active servers.`)
+                .addFields(
+                    { name: 'Page', value: `${currentPage + 1} / ${totalPages}`, inline: true },
+                    { name: 'Place ID', value: `\`${placeId}\``, inline: true }
+                )
+                .setColor(0x5865F2);
             
             if (selectedJobId) {
                 const s = servers.find(sv => sv.id === selectedJobId);
                 if (s) {
-                    content += `
-
-**Selected:** 
-${selectedJobId}
- (${s.playing} players)`;
+                    embed.addFields(
+                        { name: 'Selected Server', value: `\`${selectedJobId}\`` },
+                        { name: 'Players', value: `${s.playing} / ${s.maxPlayers}`, inline: true },
+                        { name: 'Ping / FPS', value: `${s.ping}ms / ${s.fps}`, inline: true }
+                    );
                     // Add action buttons
                     const actions = generateActionButtons('SPECIFIC');
                     components.push(actions as any);
                 }
             }
 
-            await i.update({ content, components });
+            await i.update({ content: '', embeds: [embed], components });
         };
 
         const renderBroadcastMenu = async (i: any) => {
+            const embed = new EmbedBuilder()
+                .setTitle('📢 Broadcast Mode')
+                .setDescription(`Targeting **ALL** active servers in Universe \`${universeId}\`.`)
+                .setColor(0xED4245)
+                .setFooter({ text: 'Warning: This will affect all players across all servers.' });
+
             const actions = generateActionButtons('ALL');
             const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder().setCustomId('mode-back').setLabel('Back to Mode Select').setStyle(ButtonStyle.Secondary)
             );
 
             await i.update({
-                content: `**Broadcast Mode**
-Targeting **ALL** active servers in Universe ${universeId}.`,
+                content: '',
+                embeds: [embed],
                 components: [actions, backRow]
             });
         };
@@ -196,14 +223,10 @@ Targeting **ALL** active servers in Universe ${universeId}.`,
 
         collector.on('collect', async (i) => {
             if (i.message.interaction?.id !== interaction.id && i.message.reference?.messageId !== (await interaction.fetchReply()).id) {
-                // Ensure we are handling the right message. 
-                // Interaction replies are tricky with collectors on channels. 
-                // Better check against the user ID or the specific message ID.
                  if (i.message.id !== (await interaction.fetchReply()).id) return;
             }
 
             const isAdmin = i.memberPermissions?.has(PermissionFlagsBits.Administrator);
-            // Allow original user or admins
             if (i.user.id !== interaction.user.id && !isAdmin) {
                 await i.reply({ content: 'Not authorized.', ephemeral: true });
                 return;
@@ -235,7 +258,6 @@ Targeting **ALL** active servers in Universe ${universeId}.`,
                         if (currentPage < totalPages - 1) currentPage++;
                         await renderServerSelect(i);
                     } else if (['btn-system', 'btn-normal', 'btn-custom'].includes(id)) {
-                        // Handle Message Sending Logic
                         let topic = '';
                         let modalTitle = '';
                         let showTopicInput = false;
@@ -252,12 +274,10 @@ Targeting **ALL** active servers in Universe ${universeId}.`,
                             topic = mode === 'SELECT' ? 'perseus' : 'perseus-all';
                             modalTitle = 'Send Normal Message';
                         } else {
-                            // Custom
                             modalTitle = 'Send Custom Message';
                             showTopicInput = true;
                         }
 
-                        // Show Modal
                         const modal = new ModalBuilder()
                             .setCustomId(`ctrl-modal-${Date.now()}`)
                             .setTitle(modalTitle);
@@ -279,7 +299,6 @@ Targeting **ALL** active servers in Universe ${universeId}.`,
 
                         await i.showModal(modal);
 
-                        // Handle Modal Submit
                         try {
                             const submission = await i.awaitModalSubmit({ time: 60000 });
                             
@@ -300,8 +319,6 @@ Targeting **ALL** active servers in Universe ${universeId}.`,
                                     Payload: payloadContent
                                 };
                             } else {
-                                // Broadcast All: usually just the payload, but wrapper depends on user implementation.
-                                // Assuming consistency:
                                 finalPayload = {
                                     Payload: payloadContent
                                 };
@@ -309,17 +326,22 @@ Targeting **ALL** active servers in Universe ${universeId}.`,
 
                             await robloxService.publishMessage(universeId, topic, finalPayload);
 
+                            const resultEmbed = new EmbedBuilder()
+                                .setTitle('✅ Message Sent')
+                                .setColor(0x57F287)
+                                .addFields(
+                                    { name: 'Mode', value: mode === 'SELECT' ? 'Specific Server' : 'Broadcast', inline: true },
+                                    { name: 'Topic', value: `\`${topic}\``, inline: true },
+                                    { name: 'Target', value: mode === 'SELECT' ? `\`${selectedJobId}\`` : 'All Servers' }
+                                )
+                                .setTimestamp();
+
                             await submission.reply({
-                                content: `✅ **Sent!**
-**Mode:** ${mode}
-**Topic:** 
-${topic}
-**Target:** ${mode === 'SELECT' ? selectedJobId : 'ALL SERVERS'}`,
+                                embeds: [resultEmbed],
                                 ephemeral: true
                             });
 
                         } catch (err) {
-                            // Modal cancelled or timed out
                         }
                     }
                 } else if (i.isStringSelectMenu() && i.customId === 'server-select') {
@@ -333,7 +355,7 @@ ${topic}
         });
 
         collector.on('end', async () => {
-             await interaction.editReply({ content: 'Control session timed out.', components: [] }).catch(() => {});
+             await interaction.editReply({ content: 'Control session timed out.', components: [], embeds: [] }).catch(() => {});
         });
     },
 };
